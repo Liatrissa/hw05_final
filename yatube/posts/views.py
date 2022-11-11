@@ -10,15 +10,18 @@ from .models import Follow, Group, Post
 User = get_user_model()
 
 
-def index(request):
-    post_list = Post.objects.all()
+def paginator_group(request, post_list):
     paginator = Paginator(post_list, settings.POST_PAGES)
     page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    return paginator.get_page(page_number)
+
+
+def index(request):
+    post_list = Post.objects.all()
+    page_obj = paginator_group(request, post_list)
     template = 'posts/index.html'
     context = {
         'page_obj': page_obj,
-        'paginator': paginator,
     }
     return render(request, template, context)
 
@@ -28,26 +31,19 @@ def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
     posts = group.posts.all()
     template = 'posts/group_list.html'
-    paginator = Paginator(posts, settings.POST_PAGES)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator_group(request, posts)
     context = {
         'group': group,
-        'paginator': paginator,
         'page_obj': page_obj,
     }
     return render(request, template, context)
 
 
 def profile(request, username):
+    """View-функция для страницы профиля"""
     author = get_object_or_404(User, username=username)
-    paginator = Paginator(
-        author.posts.all(),
-        settings.POST_PAGES
-    )
-    page_obj = paginator.get_page(
-        request.GET.get('page')
-    )
+    post_list = author.posts.select_related('group').all()
+    page_obj = paginator_group(request, post_list)
     following = request.user.is_authenticated
     if following:
         following = author.following.filter(user=request.user).exists()
@@ -61,6 +57,7 @@ def profile(request, username):
 
 
 def post_detail(request, post_id):
+    """View-функция для страницы с информацией о посте"""
     post = get_object_or_404(Post, pk=post_id)
     comments = post.comments.all()
     form = CommentForm()
@@ -75,6 +72,7 @@ def post_detail(request, post_id):
 
 @login_required
 def post_create(request):
+    """View-функция для страницы создания поста"""
     template = 'posts/create_post.html'
     form = PostForm(request.POST or None, files=request.FILES or None)
     if form.is_valid():
@@ -88,6 +86,7 @@ def post_create(request):
 
 @login_required
 def post_edit(request, post_id):
+    """View-функция для страницы редактирования поста"""
     post = get_object_or_404(Post, id=post_id)
     if request.user != post.author:
         return redirect('posts:post_detail', post_id)
@@ -105,6 +104,7 @@ def post_edit(request, post_id):
 
 @login_required
 def add_comment(request, post_id):
+    """View-функция для страницы добавление комментария"""
     post = get_object_or_404(Post, id=post_id)
     form = CommentForm(request.POST or None)
     if form.is_valid():
@@ -117,11 +117,10 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
+    """View-функция для страницы подписания """
     posts = Post.objects.filter(
         author__following__user=request.user)
-    paginator = Paginator(posts, settings.POST_PAGES)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator_group(request, posts)
     context = {'page_obj': page_obj}
     return render(request, 'posts/follow.html', context)
 

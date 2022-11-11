@@ -258,6 +258,7 @@ class FollowViewsTest(TestCase):
 
     def setUp(self):
         cache.clear()
+        self.guest_user = Client()
         self.author_client = Client()
         self.author_client.force_login(self.post_follower)
         self.follower_client = Client()
@@ -275,6 +276,33 @@ class FollowViewsTest(TestCase):
         self.assertEqual(follow.author_id, self.post_follower.id)
         self.assertEqual(follow.user_id, self.post_user.id)
 
+    def test_no_follow(self):
+        """Проверка подписки неавторизованного пользователя"""
+        count_follow = Follow.objects.count()
+        self.guest_user.post(
+            reverse(
+                'posts:profile_follow',
+                kwargs={'username': self.post_follower}))
+        error = 'Подписка добавлена в базу данных по ошибке'
+        self.assertNotEqual(Follow.objects.count(),
+                            count_follow + 1,
+                            error)
+
+    def test_no_follow_on_author(self):
+        """Проверка подписки пользователя самого на себя"""
+        Follow.objects.create(
+            user=self.post_user,
+            author=self.post_follower)
+        count_follow = Follow.objects.count()
+        self.follower_client.post(
+            reverse(
+                'posts:profile_follow',
+                kwargs={'username': self.post_follower}))
+        follow = Follow.objects.all().latest('id')
+        self.assertNotEqual(Follow.objects.count(),
+                            count_follow + 1)
+        self.assertNotEqual(follow.user_id, self.post_follower.id)
+
     def test_unfollow_on_user(self):
         """Проверка отписки от пользователя."""
         Follow.objects.create(
@@ -286,6 +314,9 @@ class FollowViewsTest(TestCase):
                 'posts:profile_unfollow',
                 kwargs={'username': self.post_follower}))
         self.assertEqual(Follow.objects.count(), count_follow - 1)
+        follows = Follow.objects.filter(user=self.post_user,
+                                        author=self.post_follower)
+        self.assertFalse(follows)
 
     def test_follow_on_authors(self):
         """Проверка записей у тех кто подписан."""

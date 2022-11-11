@@ -148,41 +148,35 @@ class PostFormTests(TestCase):
         self.assertNotEqual(edited_post.group.id, form_data['group'])
 
     def test_authorized_user_create_comment(self):
-        """Проверка создания коментария авторизированным клиентом."""
+        """Проверка создания комментария авторизированным клиентом."""
         comments_count = Comment.objects.count()
-        post = Post.objects.create(
-            text='Текст поста для редактирования',
-            author=self.post_author)
         form_data = {'text': 'Тестовый коментарий'}
         response = self.auth_user_comm.post(
             reverse(
                 'posts:add_comment',
-                kwargs={'post_id': post.id}),
+                kwargs={'post_id': self.post.id}),
             data=form_data,
             follow=True)
         comment = Comment.objects.latest('id')
         self.assertEqual(Comment.objects.count(), comments_count + 1)
         self.assertEqual(comment.text, form_data['text'])
         self.assertEqual(comment.author, self.comm_author)
-        self.assertEqual(comment.post_id, post.id)
+        self.assertEqual(comment.post_id, self.post.id)
         self.assertRedirects(
-            response, reverse('posts:post_detail', args={post.id}))
+            response, reverse('posts:post_detail', args={self.post.id}))
 
     def test_nonauthorized_user_create_comment(self):
         """Проверка создания комментария не авторизированным пользователем."""
         comments_count = Comment.objects.count()
-        post = Post.objects.create(
-            text='Текст поста для редактирования',
-            author=self.post_author)
         form_data = {'text': 'Тестовый коментарий'}
         response = self.guest_user.post(
             reverse(
                 'posts:add_comment',
-                kwargs={'post_id': post.id}),
+                kwargs={'post_id': self.post.id}),
             data=form_data,
             follow=True)
         redirect = reverse('login') + '?next=' + reverse(
-            'posts:add_comment', kwargs={'post_id': post.id})
+            'posts:add_comment', kwargs={'post_id': self.post.id})
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(Comment.objects.count(), comments_count)
         self.assertRedirects(response, redirect)
