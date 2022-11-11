@@ -10,18 +10,20 @@ from .models import Follow, Group, Post
 User = get_user_model()
 
 
-def paginator_group(request, post_list):
-    paginator = Paginator(post_list, settings.POST_PAGES)
+def paginator_group(request, post_list, pages):
+    paginator = Paginator(post_list, pages)
     page_number = request.GET.get('page')
     return paginator.get_page(page_number)
 
 
 def index(request):
+    """View-функция для главной страницы"""
     post_list = Post.objects.all()
-    page_obj = paginator_group(request, post_list)
     template = 'posts/index.html'
     context = {
-        'page_obj': page_obj,
+        'page_obj': paginator_group(request,
+                                    post_list,
+                                    settings.POST_PAGES)
     }
     return render(request, template, context)
 
@@ -29,12 +31,13 @@ def index(request):
 def group_posts(request, slug):
     """View-функция для страницы сообщества"""
     group = get_object_or_404(Group, slug=slug)
-    posts = group.posts.all()
+    post_list = Post.objects.filter(group=group)
     template = 'posts/group_list.html'
-    page_obj = paginator_group(request, posts)
     context = {
         'group': group,
-        'page_obj': page_obj,
+        'page_obj': paginator_group(request,
+                                    post_list,
+                                    settings.POST_PAGES),
     }
     return render(request, template, context)
 
@@ -42,14 +45,15 @@ def group_posts(request, slug):
 def profile(request, username):
     """View-функция для страницы профиля"""
     author = get_object_or_404(User, username=username)
-    post_list = author.posts.select_related('group').all()
-    page_obj = paginator_group(request, post_list)
+    post_list = Post.objects.filter(author=author)
     following = request.user.is_authenticated
     if following:
         following = author.following.filter(user=request.user).exists()
     template = 'posts/profile.html'
     context = {
-        'page_obj': page_obj,
+        'page_obj': paginator_group(request,
+                                    post_list,
+                                    settings.POST_PAGES),
         'author': author,
         'following': following
     }
@@ -118,10 +122,10 @@ def add_comment(request, post_id):
 @login_required
 def follow_index(request):
     """View-функция для страницы подписания """
-    posts = Post.objects.filter(
-        author__following__user=request.user)
-    page_obj = paginator_group(request, posts)
-    context = {'page_obj': page_obj}
+    post_list = Post.objects.filter(author__following__user=request.user)
+    context = {'page_obj': paginator_group(request,
+                                           post_list,
+                                           settings.POST_PAGES)}
     return render(request, 'posts/follow.html', context)
 
 
